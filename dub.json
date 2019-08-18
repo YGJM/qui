@@ -6,7 +6,6 @@
 	"license":"MIT",
 	"dependencies": {
 		"utils": "~>0.3.1",
-		"termbox": "~>0.0.5"
 	},"configurations": [
 		{
 			"name": "default",

@@ -7,24 +7,19 @@ module qui.qui;
 import std.datetime.stopwatch;
 import utils.misc;
 import std.conv : to;
-import termbox;
+import arsd.terminal;
 
 import qui.utils;
 
 /// How much time between each timer event
 const ushort TIMER_MSECS = 500;
-/// If a widget registers itself as keyHandler for either of these keys, the keyboardEvent for _activeWidget will also be called 
-/// when these keys are tirggered, along with handler's keyboardEvent
-const UNCATCHABLE_KEYS = [Key.space, Key.backspace, Key.tab];
 /// the default foreground color
 const Color DEFAULT_FG = Color.green;
 /// the default background color
 const Color DEFAULT_BG = Color.black;
 
 /// Available colors are in this enum
-public import termbox : Color;
-/// Availabe Keys (keyboard) for input
-public import termbox : Key;
+public import arsd.terminal : Color;
 
 ///Mouse Click, or Ms Wheel scroll event
 ///
@@ -49,6 +44,9 @@ struct MouseEvent{
 	}
 }
 
+/// Keys that aren't characters
+alias Key = arsd.terminal.KeyboardEvent.Key;
+
 ///Key press event, keyboardEvent function is called with this
 struct KeyboardEvent{
 	/// which character was entered
@@ -57,7 +55,7 @@ struct KeyboardEvent{
 	Key key;
 	/// Returns: true if the pressed key is not a character
 	/// 
-	/// Enter (`\n`), Tab (`\t`), backsace (`\b`), and space (` `) are considered characters too
+	/// Enter (`\n`), Tab (`\t`), backspace (`\b`), and space (` `) are considered characters too
 	@property bool isChar(){
 		if (charKey)
 			return true;
@@ -71,26 +69,24 @@ struct KeyboardEvent{
 		return "{key:"~to!string(key)~'}';
 	}
 	/// constructor to construct from termbox.Event
-	private this(Event e){
-		if (e.ch == 0){
+	private this(arsd.terminal.KeyboardEvent e){
+		if (e.which == 0){
 			this.charKey = 0;
-			this.key = cast(Key)e.key;
-			if (this.key == Key.space)
-				charKey = cast(dchar)' ';
-			else if (this.key == Key.backspace || this.key == Key.backspace2)
-				charKey = cast(dchar)'\b';
-			else if (this.key == Key.tab)
-				charKey = cast(dchar)'\t';
-			else if (this.key == Key.enter)
-				charKey = cast(dchar)'\n';
+			if (key >= Key.min && key <= Key.max){
+				this.key = cast(Key)e.which;
+				this.charKey = 0;
+			}else{
+				this.charKey = cast(char)e.which;
+			}
 		}else{
-			this.charKey = to!char(cast(dchar)e.ch);
+			this.charKey = to!char(cast(dchar)e.which);
 		}
 	}
 }
 
 /// Used to store position for widgets
 struct Position{
+	/// x and y position
 	integer x = 0, y = 0;
 	/// Returns: a string representation of Position
 	string tostring(){
@@ -508,6 +504,9 @@ class QTermInterface{
 private:
 	/// The QTerminal
 	QTerminal _qterminal;
+	/// Terminal
+	arsd.terminal.Terminal _terminal;
+	/// input for terminal
 	/// The current position of cursor, i.e where the next character will be written
 	Position _cursorPos;
 	/// The position that cursor will be moved to when its done drawing
@@ -653,6 +652,10 @@ public:
 /// Name in theme: 'terminal';
 class QTerminal : QLayout{
 private:
+	/// Terminal
+	arsd.terminal.Terminal _terminal;
+	/// Input getter for terminal
+	arsd.terminal.RealTimeConsoleInput _input;
 	/// stores the position of the cursor on terminal
 	Position _cursor;
 	/// array containing registered widgets
@@ -764,7 +767,7 @@ private:
 	/// Reads InputEvent[] and calls appropriate functions to address those events
 	/// 
 	/// Returns: true when there is no need to terminate (no CTRL+C pressed). false when it should terminate
-	bool readEvent(Event event){
+	bool readEvent(InputEvent event){
 		if (event.type == EventType.key){
 			if (event.key == Key.ctrlC){
 				return false;
